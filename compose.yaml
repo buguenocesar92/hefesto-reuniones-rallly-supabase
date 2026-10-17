@@ -1,0 +1,80 @@
+name: ${COMPOSE_PROJECT_NAME:-hefesto-reuniones}
+services:
+  preflight:
+    image: postgres:17-alpine@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24
+    restart: 'no'
+    entrypoint:
+    - sh
+    - /opt/hefesto/preflight.sh
+    environment:
+      PGHOST: ${DB_HOST:?Configurar host}
+      PGPORT: '5432'
+      PGDATABASE: postgres
+      PGUSER: ${DB_USER:-rallly_app}
+      PGPASSWORD: ${DB_PASSWORD:?Configurar clave}
+      PGSSLMODE: verify-full
+      PGSSLROOTCERT: /certs/ca.crt
+      PGCONNECT_TIMEOUT: '15'
+      SUPABASE_DEDICATED_CONFIRMED: ${SUPABASE_DEDICATED_CONFIRMED:-false}
+      SUPABASE_DATA_API_DISABLED: ${SUPABASE_DATA_API_DISABLED:-false}
+      BOOTSTRAP_MODE: 'false'
+      INITIAL_ADMIN_EMAIL: ${INITIAL_ADMIN_EMAIL}
+    volumes:
+    - ./ops:/opt/hefesto:ro
+    - ./certs:/certs:ro
+  app:
+    image: lukevella/rallly:4.15.4@sha256:8f29eccdc2fbb856001ea3c97d1c1d85556095274ad21a8de0c0125f29303938
+    restart: unless-stopped
+    stop_grace_period: 60s
+    entrypoint:
+    - sh
+    - /opt/hefesto/start.sh
+    environment:
+      DATABASE_URL: postgresql://${DB_USER:-rallly_app}:${DB_PASSWORD}@${DB_HOST}:5432/postgres?sslmode=verify-full&sslrootcert=/certs/ca.crt
+      DIRECT_DATABASE_URL: postgresql://${DB_USER:-rallly_app}:${DB_PASSWORD}@${DB_HOST}:5432/postgres?schema=public&sslmode=require&sslaccept=strict&sslcert=/certs/ca.crt
+      SECRET_PASSWORD: ${SECRET_PASSWORD:?Configurar secreto}
+      NEXT_PUBLIC_BASE_URL: ${PUBLIC_URL:?Configurar dominio HTTPS}
+      SUPPORT_EMAIL: ${SUPPORT_EMAIL:?Configurar email soporte}
+      NOREPLY_EMAIL: ${NOREPLY_EMAIL:?Configurar remitente}
+      INITIAL_ADMIN_EMAIL: ${INITIAL_ADMIN_EMAIL:?Configurar administrador}
+      ALLOWED_EMAILS: ${ALLOWED_EMAILS:?Restringir acceso}
+      REGISTRATION_ENABLED: 'false'
+      EMAIL_LOGIN_ENABLED: 'true'
+      EMAIL_PROVIDER: smtp
+      SMTP_HOST: ${SMTP_HOST:-REEMPLAZAR}
+      SMTP_PORT: '465'
+      SMTP_USER: ${SMTP_USER:-REEMPLAZAR}
+      SMTP_PWD: ${SMTP_PASSWORD:-REEMPLAZAR}
+      SMTP_SECURE: 'true'
+      SMTP_REJECT_UNAUTHORIZED: 'true'
+      SMTP_DEBUG: 'false'
+      SMTP_READY: ${SMTP_READY:-false}
+      BOOTSTRAP_MODE: 'false'
+      MODERATION_ENABLED: 'false'
+      RATE_LIMIT_ENABLED: 'true'
+      HIDE_ATTRIBUTION: 'false'
+      TZ: America/Santiago
+    volumes:
+    - ./ops:/opt/hefesto:ro
+    - ./certs:/certs:ro
+    expose:
+    - '3000'
+    depends_on:
+      preflight:
+        condition: service_completed_successfully
+  dbtools:
+    image: postgres:17-alpine@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24
+    profiles:
+    - tools
+    environment:
+      PGHOST: ${DB_HOST:?Configurar host}
+      PGPORT: '5432'
+      PGDATABASE: postgres
+      PGUSER: ${DB_USER:-rallly_app}
+      PGPASSWORD: ${DB_PASSWORD:?Configurar clave}
+      PGSSLMODE: verify-full
+      PGSSLROOTCERT: /certs/ca.crt
+      PGCONNECT_TIMEOUT: '15'
+    volumes:
+    - ./ops:/opt/hefesto:ro
+    - ./certs:/certs:ro
