@@ -1,4 +1,3 @@
-name: ${COMPOSE_PROJECT_NAME:-hefesto-reuniones}
 services:
   preflight:
     image: postgres:17-alpine@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24
@@ -9,14 +8,15 @@ services:
     environment:
       PGHOST: ${DB_HOST:?Configurar host}
       PGPORT: '5432'
-      PGDATABASE: postgres
+      PGDATABASE: ${DB_NAME:-postgres}
       PGUSER: ${DB_USER:-rallly_app}
       PGPASSWORD: ${DB_PASSWORD:?Configurar clave}
-      PGSSLMODE: verify-full
-      PGSSLROOTCERT: /certs/ca.crt
+      PGSSLMODE: ${DB_SSLMODE:-verify-full}
+      PGSSLROOTCERT: ${PGSSLROOTCERT:-/certs/ca.crt}
       PGCONNECT_TIMEOUT: '15'
       SUPABASE_DEDICATED_CONFIRMED: ${SUPABASE_DEDICATED_CONFIRMED:-false}
       SUPABASE_DATA_API_DISABLED: ${SUPABASE_DATA_API_DISABLED:-false}
+      DB_ALLOW_INTERNAL_HOST: ${DB_ALLOW_INTERNAL_HOST:-false}
       BOOTSTRAP_MODE: 'false'
       INITIAL_ADMIN_EMAIL: ${INITIAL_ADMIN_EMAIL}
     volumes:
@@ -30,8 +30,13 @@ services:
     - sh
     - /opt/hefesto/start.sh
     environment:
-      DATABASE_URL: postgresql://${DB_USER:-rallly_app}:${DB_PASSWORD}@${DB_HOST}:5432/postgres?sslmode=verify-full&sslrootcert=/certs/ca.crt
-      DIRECT_DATABASE_URL: postgresql://${DB_USER:-rallly_app}:${DB_PASSWORD}@${DB_HOST}:5432/postgres?schema=public&sslmode=require&sslaccept=strict&sslcert=/certs/ca.crt
+      DATABASE_URL: ${DATABASE_URL:-}
+      DIRECT_DATABASE_URL: ${DIRECT_DATABASE_URL:-}
+      DB_NAME: ${DB_NAME:-postgres}
+      DB_SSLMODE: ${DB_SSLMODE:-verify-full}
+      DB_SSLROOTCERT: ${DB_SSLROOTCERT:-/certs/ca.crt}
+      DB_SSLCERT: ${DB_SSLCERT:-/certs/ca.crt}
+      DB_USER: ${DB_USER:-rallly_app}
       SECRET_PASSWORD: ${SECRET_PASSWORD:?Configurar secreto}
       NEXT_PUBLIC_BASE_URL: ${PUBLIC_URL:?Configurar dominio HTTPS}
       SUPPORT_EMAIL: ${SUPPORT_EMAIL:?Configurar email soporte}
@@ -69,11 +74,11 @@ services:
     environment:
       PGHOST: ${DB_HOST:?Configurar host}
       PGPORT: '5432'
-      PGDATABASE: postgres
+      PGDATABASE: ${DB_NAME:-postgres}
       PGUSER: ${DB_USER:-rallly_app}
       PGPASSWORD: ${DB_PASSWORD:?Configurar clave}
-      PGSSLMODE: verify-full
-      PGSSLROOTCERT: /certs/ca.crt
+      PGSSLMODE: ${DB_SSLMODE:-verify-full}
+      PGSSLROOTCERT: ${PGSSLROOTCERT:-/certs/ca.crt}
       PGCONNECT_TIMEOUT: '15'
     volumes:
     - ./ops:/opt/hefesto:ro

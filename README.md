@@ -41,6 +41,30 @@ El Compose base cierra REGISTRATION_ENABLED y mantiene ALLOWED_EMAILS. No dejar 
 
 Si se pasa desde Compose manual a Coolify, usar respaldo/restauración hacia el proyecto Supabase de destino o verificar explícitamente que se conserva el mismo proyecto autorizado. No levantar dos instancias operativas contra el mismo proyecto sin diseñarlo. Para retirar bootstrap manual, detener con ambos archivos y recrear solo con compose.yaml; verificar que desaparecen los puertos locales y Mailpit.
 
+## Despliegue en Coolify (MVP Hefesto)
+Variables nuevas que el compose acepta en `.env` de Coolify para reutilizar
+un Postgres compartido del stack (no son obligatorias: el comportamiento
+anterior sigue siendo el valor por defecto):
+
+- `DB_NAME` (defecto `postgres`): nombre de la base dentro del Postgres
+  compartido. Aparece en `DATABASE_URL` y `DIRECT_DATABASE_URL`.
+- `DB_SSLMODE` (defecto `verify-full`): modo TLS del driver Node pg. Para
+  Prisma se usa `require` con `sslaccept=strict` salvo que esta variable
+  sea `disable`. Con `verify-full` se exige la CA; con otros valores la
+  CA no es obligatoria y el DSN omite `sslrootcert`/`sslcert`.
+- `DB_SSLROOTCERT`, `DB_SSLCERT` (defecto `/certs/ca.crt`): rutas a la CA.
+  Definir como cadena vacía para omitir el parámetro del DSN.
+- `DB_ALLOW_INTERNAL_HOST` (defecto `false`): permite hosts que no sean
+  `*.supabase.co` en el preflight cuando `DB_SSLMODE=disable`.
+
+El preflight y `validate.cjs` aceptan el arranque con `SMTP_READY=false`
+para despliegues sin correo real; el envío queda desactivado hasta que se
+configure el proveedor y se marque `SMTP_READY=true`.
+
+`bash scripts/coolify-check.sh` valida que el `compose.yaml` cumple el
+contrato Coolify (sin `ports`, `container_name`, `privileged`, `name:`
+fijo en raíz/redes/volúmenes, ni `docker.sock`).
+
 ## Datos, archivos y límites
 Usuarios, votaciones, votos, sesiones y cola de correo están en PostgreSQL. Este kit no configura S3/Garage/R2 ni cargas de imágenes, logos o adjuntos; sus ejemplos usan texto y fechas. No hay volumen local de datos del servicio que sustituya el respaldo DB. Si luego se añade almacenamiento externo, respaldarlo y recuperarlo por separado de forma coherente.
 
