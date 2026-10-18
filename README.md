@@ -54,16 +54,36 @@ anterior sigue siendo el valor por defecto):
   CA no es obligatoria y el DSN omite `sslrootcert`/`sslcert`.
 - `DB_SSLROOTCERT`, `DB_SSLCERT` (defecto `/certs/ca.crt`): rutas a la CA.
   Definir como cadena vacía para omitir el parámetro del DSN.
-- `DB_ALLOW_INTERNAL_HOST` (defecto `false`): permite hosts que no sean
-  `*.supabase.co` en el preflight cuando `DB_SSLMODE=disable`.
 
-El preflight y `validate.cjs` aceptan el arranque con `SMTP_READY=false`
-para despliegues sin correo real; el envío queda desactivado hasta que se
-configure el proveedor y se marque `SMTP_READY=true`.
+Requisitos operativos del preflight público y de `validate.cjs` (los
+comprueba el despliegue; fallan si falta algo, no se autoconfiguran):
+
+- La base de datos es exclusiva de esta app: `mvp_<slug>` dentro del
+  Postgres compartido, con dueño `rallly_app`. Antes del despliegue se
+  debe haber ejecutado `sql/01-supabase-app.sql` con un usuario
+  administrativo (crea `rallly_app`, prepara `public` y la extensión
+  `citext`, restringe privilegios por defecto).
+- El usuario fijo es `rallly_app`; no cambiarlo salvo que también se
+  modifique el bootstrap.
+- `DB_PASSWORD` debe ser hex de exactamente 64 caracteres. No usar la
+  generada por defecto si no calza esa longitud.
+- `SUPABASE_DEDICATED_CONFIRMED=true` y `SUPABASE_DATA_API_DISABLED=true`
+  son obligatorios (Data API apagada, proyecto dedicado).
+- El administrador debe existir antes del despliegue: crear la cuenta
+  inicial mediante el flujo de bootstrap (`compose.bootstrap.yaml`) y
+  reclamar el rol por `/admin-setup`. El preflight público exige ese
+  usuario con `role=admin`.
+
+Con `SMTP_READY=false` la app arranca pero los envíos quedan en estado
+de fallo, incluido el login por correo y los códigos de verificación.
+Hasta configurar un SMTP real hay que entrar con la cuenta
+administradora creada por bootstrap (no por enlace de correo).
 
 `bash scripts/coolify-check.sh` valida que el `compose.yaml` cumple el
 contrato Coolify (sin `ports`, `container_name`, `privileged`, `name:`
-fijo en raíz/redes/volúmenes, ni `docker.sock`).
+fijo en raíz/redes/volúmenes, ni `docker.sock`); además comprueba que
+`DB_NAME`, `DB_SSLMODE`, `DB_HOST` y `DB_PASSWORD` lleguen al servicio
+web para que `ops/start.sh` pueda armar los DSN sin abortar.
 
 ## Datos, archivos y límites
 Usuarios, votaciones, votos, sesiones y cola de correo están en PostgreSQL. Este kit no configura S3/Garage/R2 ni cargas de imágenes, logos o adjuntos; sus ejemplos usan texto y fechas. No hay volumen local de datos del servicio que sustituya el respaldo DB. Si luego se añade almacenamiento externo, respaldarlo y recuperarlo por separado de forma coherente.

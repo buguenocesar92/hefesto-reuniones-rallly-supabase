@@ -132,20 +132,24 @@ for svc in $NO_PROFILE; do
         fail "$svc: ipc=host; quitarlo"
     fi
     SEC=$(echo "$RENDERED" | jq --arg s "$svc" \
-        '.services[$s].security_opt // [] | map(select(. == "unconfined")) | length')
+        '.services[$s].security_opt // [] | map(select(test("unconfined"))) | length')
     if [ "$SEC" != "0" ]; then
         fail "$svc: security_opt=unconfined; quitarlo"
     fi
     ok "$svc sin privilegios de sandbox"
 
-    # 1d) Sin binds prohibidos: docker.sock siempre vetado. Los paths
-    #    './ops' y './certs' son mounts legítimos del kit dentro del repo.
-    BAD=$(echo "$RENDERED" | jq --arg s "$svc" '
+    # 1d) Sin binds prohibidos: docker.sock siempre vetado y ningún bind
+    #    puede apuntar fuera del repo (los paths deben empezar por $ROOT/).
+    BAD=$(echo "$RENDERED" | jq --arg s "$svc" --arg root "$ROOT" '
         .services[$s].volumes // []
-        | map(select((.source // "") | test("docker\\.sock")))
+        | map(select((.type // "") == "bind"))
+        | map(select(
+            ((.source // "") | startswith($root + "/") | not)
+            or ((.source // "") | test("docker\\.sock"))
+        ))
         | length')
     if [ "$BAD" != "0" ]; then
-        fail "$svc: monta docker.sock; quitarlo"
+        fail "$svc: hay binds prohibidos (absolutos o docker.sock)"
     fi
     ok "$svc sin docker.sock"
 done
@@ -181,5 +185,17 @@ if [ "$DB_SSLMODE_VAL" != "disable" ]; then
     fail "supabase-pg: DB_SSLMODE=$DB_SSLMODE_VAL (esperado disable) en servicio web"
 fi
 ok "DB_SSLMODE=disable presente en servicio web"
+
+# El DSN del servicio web se arma con DB_HOST/DB_PASSWORD; sin ellos
+# start.sh aborta por 'parameter not set' antes de llegar a validate.cjs.
+DB_HOST_VAL=$(echo "$RENDERED" | jq -r '.services.app.environment.DB_HOST // ""')
+DB_PASSWORD_VAL=$(echo "$RENDERED" | jq -r '.services.app.environment.DB_PASSWORD // ""')
+if [ -z "$DB_HOST_VAL" ]; then
+    fail "supabase-pg: DB_HOST vacio en servicio web (start.sh aborta)"
+fi
+if [ -z "$DB_PASSWORD_VAL" ]; then
+    fail "supabase-pg: DB_PASSWORD vacio en servicio web (start.sh aborta)"
+fi
+ok "DB_HOST y DB_PASSWORD presentes en servicio web"
 
 echo "==> Todas las comprobaciones pasaron"

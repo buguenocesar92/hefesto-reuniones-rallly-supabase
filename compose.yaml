@@ -12,11 +12,10 @@ services:
       PGUSER: ${DB_USER:-rallly_app}
       PGPASSWORD: ${DB_PASSWORD:?Configurar clave}
       PGSSLMODE: ${DB_SSLMODE:-verify-full}
-      PGSSLROOTCERT: ${PGSSLROOTCERT:-/certs/ca.crt}
+      PGSSLROOTCERT: ${DB_SSLROOTCERT:-/certs/ca.crt}
       PGCONNECT_TIMEOUT: '15'
       SUPABASE_DEDICATED_CONFIRMED: ${SUPABASE_DEDICATED_CONFIRMED:-false}
       SUPABASE_DATA_API_DISABLED: ${SUPABASE_DATA_API_DISABLED:-false}
-      DB_ALLOW_INTERNAL_HOST: ${DB_ALLOW_INTERNAL_HOST:-false}
       BOOTSTRAP_MODE: 'false'
       INITIAL_ADMIN_EMAIL: ${INITIAL_ADMIN_EMAIL}
     volumes:
@@ -29,6 +28,14 @@ services:
     entrypoint:
     - sh
     - /opt/hefesto/start.sh
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - node -e "fetch('http://127.0.0.1:3000/').then(r=>process.exit(r.status<500?0:1)).catch(()=>process.exit(1))"
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 180s
     environment:
       DATABASE_URL: ${DATABASE_URL:-}
       DIRECT_DATABASE_URL: ${DIRECT_DATABASE_URL:-}
@@ -37,6 +44,8 @@ services:
       DB_SSLROOTCERT: ${DB_SSLROOTCERT:-/certs/ca.crt}
       DB_SSLCERT: ${DB_SSLCERT:-/certs/ca.crt}
       DB_USER: ${DB_USER:-rallly_app}
+      DB_HOST: ${DB_HOST:?Configurar host}
+      DB_PASSWORD: ${DB_PASSWORD:?Configurar clave}
       SECRET_PASSWORD: ${SECRET_PASSWORD:?Configurar secreto}
       NEXT_PUBLIC_BASE_URL: ${PUBLIC_URL:?Configurar dominio HTTPS}
       SUPPORT_EMAIL: ${SUPPORT_EMAIL:?Configurar email soporte}
@@ -78,7 +87,7 @@ services:
       PGUSER: ${DB_USER:-rallly_app}
       PGPASSWORD: ${DB_PASSWORD:?Configurar clave}
       PGSSLMODE: ${DB_SSLMODE:-verify-full}
-      PGSSLROOTCERT: ${PGSSLROOTCERT:-/certs/ca.crt}
+      PGSSLROOTCERT: ${DB_SSLROOTCERT:-/certs/ca.crt}
       PGCONNECT_TIMEOUT: '15'
     volumes:
     - ./ops:/opt/hefesto:ro
