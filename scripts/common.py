@@ -1,19 +1,38 @@
-import hashlib,json,subprocess
+"""Utilidades compartidas del kit de reuniones.
+
+La validacion del respaldo tiene UNA sola fuente de verdad:
+scripts/check_backup.py (docs/CONTRATO-RESPALDO.md). Este modulo mantiene su
+API publica (ROOT, PRODUCT, VERSION, FILES, dc, sha, verify) y delega la
+verificacion para que no exista una segunda interpretacion del contrato.
+"""
+import hashlib
+import json
+import subprocess
+import sys
 from pathlib import Path
-ROOT=Path(__file__).resolve().parents[1]
-PRODUCT='hefesto-reuniones'
-VERSION='4.15.4'
-FILES=['.env','compose.yaml','compose.bootstrap.yaml','ops/start.sh','ops/validate.cjs','ops/preflight.sh','ops/preflight.sql','ops/production.sql','certs/ca.crt']
-def dc(*args,**kw):
-    return subprocess.run(['docker','compose','--project-directory',str(ROOT),'-f',str(ROOT/'compose.yaml'),*args],check=True,**kw)
+
+ROOT = Path(__file__).resolve().parents[1]
+KIT = json.loads((ROOT / 'scripts' / 'kit.json').read_text())
+PRODUCT = KIT['software']
+VERSION = KIT['version']
+FILES = KIT.get('piezas', [])
+
+
+def dc(*args, **kw):
+    return subprocess.run(['docker', 'compose', '--project-directory', str(ROOT),
+                           '-f', str(ROOT / 'compose.yaml'), *args], check=True, **kw)
+
+
 def sha(path):
-    with path.open('rb') as f:return hashlib.file_digest(f,'sha256').hexdigest()
+    with path.open('rb') as f:
+        return hashlib.file_digest(f, 'sha256').hexdigest()
+
+
 def verify(path):
-    src=Path(path).resolve();m=json.loads((src/'manifest.json').read_text())
-    if (m.get('product'),m.get('version'),m.get('status'))!=(PRODUCT,VERSION,'completed'):raise SystemExit('Manifest incorrecto')
-    if set(m.get('sha256',{}))!=set(FILES+['public.dump']):raise SystemExit('Lista de archivos inesperada')
-    for name,digest in m['sha256'].items():
-        p=src/name
-        if p.is_symlink() or not p.is_file() or src not in p.resolve().parents:raise SystemExit('Ruta no admitida')
-        if sha(p)!=digest:raise SystemExit('Checksum incorrecto: '+name)
-    return src
+    """Valida el respaldo con el verificador canonico del contrato."""
+    verificador = ROOT / 'scripts' / 'check_backup.py'
+    proc = subprocess.run([sys.executable, str(verificador), str(path),
+                           '--software', PRODUCT], capture_output=True, text=True)
+    if proc.returncode != 0:
+        raise SystemExit((proc.stderr or proc.stdout).strip() or 'Respaldo invalido')
+    return Path(path).resolve()
